@@ -21,4 +21,8 @@ public sealed class CastCrewActorsQuery
     public string? LibraryIds { get; set; }
 
     public Guid? UserId { get; set; }
+
+    public int? MinAge { get; set; }
+    
+    public int? MaxAge { get; set; }
 }

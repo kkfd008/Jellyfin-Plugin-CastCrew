@@ -19,6 +19,85 @@
     var castCrewLinkTargetBoundAttr = 'data-castcrew-link-bound';
     var navContainerSelectors = '.mainDrawerPanel a[href], .navMenuOption[href], header a[href], .headerTabs a[href], .sectionTabs a[href]';
 
+    // 独立的语言字典
+    var CC_I18N = {
+        "zh-CN": {
+            search: "搜索姓名...",
+            minAge: "最小",
+            maxAge: "最大",
+            sortNameAsc: "名字 (A-Z)",
+            sortNameDesc: "名字 (Z-A)",
+            sortAgeDesc: "年龄 (从大到小)",
+            sortAgeAsc: "年龄 (从小到大)",
+            sortDateDesc: "最近添加",
+            sortDateAsc: "最早添加",
+            sortRandom: "随机",
+            actors: "演员",
+            directors: "导演",
+            producers: "制片人",
+            searchBtn: "搜索",
+            allLibraries: "所有媒体库",
+            allTags: "所有标签",
+            allCountries: "所有国家/地区",
+            library: "媒体库",
+            tags: "标签",
+            country: "国家/地区",
+            favoritesOnly: "仅收藏",
+            nameMatches: "名字匹配",
+            descMatches: "简介匹配",
+            noResults: "未找到结果",
+            noNameMatches: "未找到名字匹配结果",
+            noDescMatches: "未找到简介匹配结果",
+            loading: "加载中...",
+            items: "项",
+            page: "页",
+            of: "/",
+            previous: "上一页",
+            next: "下一页",
+            lastSynced: "最后同步: ",
+            pending: "等待中"
+        },
+        "en-US": {
+            search: "Search...",
+            minAge: "Min",
+            maxAge: "Max",
+            sortNameAsc: "Name ↑",
+            sortNameDesc: "Name ↓",
+            sortAgeDesc: "Age (Oldest)",
+            sortAgeAsc: "Age (Youngest)",
+            sortDateDesc: "Date Added (Newest)",
+            sortDateAsc: "Date Added (Oldest)",
+            sortRandom: "Random",
+            actors: "Actors",
+            directors: "Directors",
+            producers: "Producers",
+            searchBtn: "Search",
+            allLibraries: "All libraries",
+            allTags: "All tags",
+            allCountries: "All countries/regions",
+            library: "Library",
+            tags: "Tags",
+            country: "Country/Region",
+            favoritesOnly: "Favorites only",
+            nameMatches: "Name matches",
+            descMatches: "Description matches",
+            noResults: "No results found.",
+            noNameMatches: "No name matches found.",
+            noDescMatches: "No description matches found.",
+            loading: "Loading...",
+            items: "items",
+            page: "Page",
+            of: "/",
+            previous: "Previous",
+            next: "Next",
+            lastSynced: "Last synced: ",
+            pending: "pending"
+        }
+    };
+
+    var currentLang = (navigator.language || "en-US").startsWith("zh") ? "zh-CN" : "en-US";
+    var t = CC_I18N[currentLang];
+
     var state = {
         initialized: false,
         activeTab: 'Actors',
@@ -26,6 +105,8 @@
         pageSize: 50,
         pageIndex: 0,
         searchTerm: '',
+        minAge: '',
+        maxAge: '',
         sortBy: 'Name',
         sortOrder: 'Ascending',
         totalCount: 0,
@@ -47,8 +128,22 @@
     var scheduled = null;
     var lastObserverFireTime = 0;
 
+    // Load UILanguage from configuration if possible
+    function updateLanguageFromConfig() {
+        if (window.ApiClient && window.ApiClient.getPluginConfiguration) {
+            var pluginId = "a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a";
+            window.ApiClient.getPluginConfiguration(pluginId).then(function(config) {
+                if (config && config.UILanguage && config.UILanguage !== 'auto') {
+                    currentLang = config.UILanguage;
+                    t = CC_I18N[currentLang] || CC_I18N['en-US'];
+                }
+            }).catch(function(e){});
+        }
+    }
+    updateLanguageFromConfig();
+
     function normalizeSortBy(value) {
-        if (value === 'DateCreated' || value === 'Random') {
+        if (value === 'DateCreated' || value === 'Random' || value === 'Age') {
             return value;
         }
 
@@ -564,9 +659,16 @@
             '.castcrew-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75em; margin-bottom: 1em; }',
             '.castcrew-toolbar-left { display: flex; gap: .5em; align-items: center; }',
             '.castcrew-toolbar-right { display: flex; gap: .5em; align-items: center; position: relative; }',
-            '.castcrew-input, .castcrew-select { background: var(--castcrew-control-bg); border: 1px solid var(--castcrew-control-border); color: var(--castcrew-menu-text); border-radius: .4em; padding: .5em .65em; min-height: 2.2em; }',
+            //'.castcrew-input, .castcrew-select { background: var(--castcrew-control-bg); border: 1px solid var(--castcrew-control-border); color: var(--castcrew-menu-text); border-radius: .4em; padding: .5em .65em; min-height: 2.2em; }',
+            //'.castcrew-input { min-width: 14em; }',
+            // 修正年龄输入框样式
+            //'.castcrew-age-input { width: 5em; min-width: 4em; padding: .5em .4em; text-align: center; }',
+            //'.castcrew-button { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: inherit; border-radius: .4em; padding: .5em .85em; cursor: pointer; }',
+            '.castcrew-input, .castcrew-select { background: var(--castcrew-control-bg); border: 1px solid var(--castcrew-control-border); color: var(--castcrew-menu-text); border-radius: .4em; padding: 0 .65em; height: 2.4em; box-sizing: border-box; font-family: inherit; }',
             '.castcrew-input { min-width: 14em; }',
-            '.castcrew-button { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: inherit; border-radius: .4em; padding: .5em .85em; cursor: pointer; }',
+            '.castcrew-age-input { width: 5em !important; min-width: 4em !important; padding: 0 .4em !important; text-align: center; -moz-appearance: textfield; }',
+            '.castcrew-age-input::-webkit-outer-spin-button, .castcrew-age-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }',
+            '.castcrew-button { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: inherit; border-radius: .4em; padding: 0 .85em; height: 2.4em; box-sizing: border-box; cursor: pointer; }',
             '.castcrew-button[disabled] { opacity: .5; cursor: default; }',
             '.castcrew-icon-button { background: none; border: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.7); border-radius: .4em; padding: .4em; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 2.2em; height: 2.2em; }',
             '.castcrew-icon-button:hover { color: #fff; border-color: rgba(255,255,255,.4); }',
@@ -612,7 +714,7 @@
             '<div class=\"sectionTitleContainer castcrew-title-row\">' +
                 '<h2 class=\"sectionTitle\">Cast &amp; Crew</h2>' +
                 '<div class=\"castcrew-title-actions\">' +
-                    '<span id=\"castcrewSyncStatus\" class=\"castcrew-sync-status\">Last synced: pending</span>' +
+                    '<span id=\"castcrewSyncStatus\" class=\"castcrew-sync-status\">' + t.lastSynced + t.pending + '</span>' +
                     '<button id=\"castcrewRefreshButton\" class=\"castcrew-icon-button\" type=\"button\" title=\"Refresh library mapping\" aria-label=\"Refresh library mapping\">' +
                         '<span class=\"material-icons\">refresh</span>' +
                     '</button>' +
@@ -622,14 +724,18 @@
                 '</div>' +
             '</div>' +
             '<div class=\"castcrew-tabs\" role=\"tablist\">' +
-                '<button class=\"castcrew-tab castcrew-tab-active\" type=\"button\" role=\"tab\" data-tab=\"Actors\" aria-selected=\"true\">Actors</button>' +
-                '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Directors\" aria-selected=\"false\">Directors</button>' +
-                '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Producers\" aria-selected=\"false\">Producers</button>' +
+                '<button class=\"castcrew-tab castcrew-tab-active\" type=\"button\" role=\"tab\" data-tab=\"Actors\" aria-selected=\"true\">' + t.actors + '</button>' +
+                '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Directors\" aria-selected=\"false\">' + t.directors + '</button>' +
+                '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Producers\" aria-selected=\"false\">' + t.producers + '</button>' +
             '</div>' +
             '<div class=\"castcrew-toolbar\">' +
                 '<div class=\"castcrew-toolbar-left\">' +
-                    '<input id=\"castcrewSearchInput\" class=\"castcrew-input\" type=\"search\" placeholder=\"Search...\" />' +
-                    '<button id=\"castcrewSearchButton\" class=\"castcrew-button\" type=\"button\">Search</button>' +
+                    '<input id=\"castcrewSearchInput\" class=\"castcrew-input\" type=\"search\" placeholder=\"' + t.search + '\" />' +
+                    // 修正高度与宽度，限制 1~99
+                    '<input id=\"castcrewMinAgeInput\" class=\"castcrew-input castcrew-age-input\" type=\"number\" placeholder=\"' + t.minAge + '\" min=\"1\" max=\"99\" maxlength=\"2\" />' +
+                    '<span style=\"color:rgba(255,255,255,.5);\">-</span>' +
+                    '<input id=\"castcrewMaxAgeInput\" class=\"castcrew-input castcrew-age-input\" type=\"number\" placeholder=\"' + t.maxAge + '\" min=\"1\" max=\"99\" maxlength=\"2\" />' +
+                    '<button id=\"castcrewSearchButton\" class=\"castcrew-button\" type=\"button\">' + t.searchBtn + '</button>' +
                 '</div>' +
                 '<div class=\"castcrew-toolbar-right\">' +
                     '<span id=\"castcrewCountIndicator\" class=\"castcrew-count\"></span>' +
@@ -637,28 +743,30 @@
                         '<span class=\"material-icons\">view_module</span>' +
                     '</button>' +
                     '<select id=\"castcrewSortSelect\" class=\"castcrew-select\" aria-label=\"Sort\">' +
-                        '<option value=\"Name,Ascending\">Name ↑</option>' +
-                        '<option value=\"Name,Descending\">Name ↓</option>' +
-                        '<option value=\"DateCreated,Descending\">Date Added (Newest)</option>' +
-                        '<option value=\"DateCreated,Ascending\">Date Added (Oldest)</option>' +
-                        '<option value=\"Random,Ascending\">Random</option>' +
+                        '<option value=\"Name,Ascending\">' + t.sortNameAsc + '</option>' +
+                        '<option value=\"Name,Descending\">' + t.sortNameDesc + '</option>' +
+                        '<option value=\"Age,Descending\">' + t.sortAgeDesc + '</option>' +
+                        '<option value=\"Age,Ascending\">' + t.sortAgeAsc + '</option>' +
+                        '<option value=\"DateCreated,Descending\">' + t.sortDateDesc + '</option>' +
+                        '<option value=\"DateCreated,Ascending\">' + t.sortDateAsc + '</option>' +
+                        '<option value=\"Random,Ascending\">' + t.sortRandom + '</option>' +
                     '</select>' +
                     '<button id=\"castcrewFilterButton\" class=\"castcrew-icon-button\" type=\"button\" title=\"Filter\" aria-label=\"Filter\">' +
                         '<span class=\"material-icons\">filter_list</span>' +
                     '</button>' +
                     '<div id=\"castcrewFilterMenu\" class=\"castcrew-filter-menu\" hidden>' +
-                        '<label class=\"castcrew-filter-label\" for=\"castcrewLibraryFilter\">Library</label>' +
+                        '<label class=\"castcrew-filter-label\" for=\"castcrewLibraryFilter\">' + t.library + '</label>' +
                         '<select id=\"castcrewLibraryFilter\" class=\"castcrew-filter-select\">' +
-                            '<option value=\"\">All libraries</option>' +
+                            '<option value=\"\">' + t.allLibraries + '</option>' +
                         '</select>' +
-                        '<label class=\"castcrew-filter-option\"><input type=\"checkbox\" id=\"castcrewFavFilter\" /> Favorites only</label>' +
-                        '<label class=\"castcrew-filter-label\" for=\"castcrewTagFilter\">Tags</label>' +
+                        '<label class=\"castcrew-filter-option\"><input type=\"checkbox\" id=\"castcrewFavFilter\" /> ' + t.favoritesOnly + '</label>' +
+                        '<label class=\"castcrew-filter-label\" for=\"castcrewTagFilter\">' + t.tags + '</label>' +
                         '<select id=\"castcrewTagFilter\" class=\"castcrew-filter-select\">' +
-                            '<option value=\"\">All tags</option>' +
+                            '<option value=\"\">' + t.allTags + '</option>' +
                         '</select>' +
-                        '<label class=\"castcrew-filter-label\" for=\"castcrewCountryFilter\">Country/Region</label>' +
+                        '<label class=\"castcrew-filter-label\" for=\"castcrewCountryFilter\">' + t.country + '</label>' +
                         '<select id=\"castcrewCountryFilter\" class=\"castcrew-filter-select\">' +
-                            '<option value=\"\">All countries/regions</option>' +
+                            '<option value=\"\">' + t.allCountries + '</option>' +
                         '</select>' +
                     '</div>' +
                 '</div>' +
@@ -667,9 +775,9 @@
             '<div id=\"castcrewGrid\" class=\"castcrew-grid\" hidden></div>' +
             '<div id=\"castcrewDescGrid\" class=\"castcrew-grid\" hidden></div>' +
             '<div class=\"castcrew-pagination\">' +
-                '<button id=\"castcrewPrevButton\" class=\"castcrew-button\" type=\"button\">Previous</button>' +
+                '<button id=\"castcrewPrevButton\" class=\"castcrew-button\" type=\"button\">' + t.previous + '</button>' +
                 '<span id=\"castcrewPageInfo\" class=\"castcrew-meta\"></span>' +
-                '<button id=\"castcrewNextButton\" class=\"castcrew-button\" type=\"button\">Next</button>' +
+                '<button id=\"castcrewNextButton\" class=\"castcrew-button\" type=\"button\">' + t.next + '</button>' +
             '</div>';
 
         page.appendChild(host);
@@ -714,6 +822,8 @@
         refs = {
             host: host,
             searchInput: host.querySelector('#castcrewSearchInput'),
+            minAgeInput: host.querySelector('#castcrewMinAgeInput'),
+            maxAgeInput: host.querySelector('#castcrewMaxAgeInput'),
             sortSelect: host.querySelector('#castcrewSortSelect'),
             searchButton: host.querySelector('#castcrewSearchButton'),
             syncStatus: host.querySelector('#castcrewSyncStatus'),
@@ -735,6 +845,21 @@
             pageInfo: host.querySelector('#castcrewPageInfo')
         };
 
+        // 限制年龄输入格式
+        function handleAgeInput(e) {
+            var val = e.target.value;
+            // 如果输入非数字，或长度超过2，或为负数，都进行修正
+            if (val) {
+                var num = parseInt(val, 10);
+                if (isNaN(num) || num < 1) e.target.value = '';
+                else if (num > 99) e.target.value = 99;
+                else e.target.value = num;
+            }
+        }
+        refs.minAgeInput.addEventListener('input', handleAgeInput);
+        refs.maxAgeInput.addEventListener('input', handleAgeInput);
+
+
         // Tab click handling
         var tabs = Array.prototype.slice.call(host.querySelectorAll('.castcrew-tab'));
         tabs.forEach(function (tab) {
@@ -747,7 +872,11 @@
                 state.activeTab = tabName;
                 state.pageIndex = 0;
                 state.searchTerm = '';
+                state.minAge = '';
+                state.maxAge = '';
                 refs.searchInput.value = '';
+                refs.minAgeInput.value = '';
+                refs.maxAgeInput.value = '';
 
                 tabs.forEach(function (t) {
                     t.classList.remove('castcrew-tab-active');
@@ -763,11 +892,36 @@
         refs.searchButton.addEventListener('click', runSearch);
         refs.refreshButton.addEventListener('click', refreshLibraryMapping);
         refs.settingsButton.addEventListener('click', openCastCrewSettings);
+        
         refs.searchInput.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter') {
-                runSearch();
-            }
+            if (event.key === 'Enter') runSearch();
         });
+        // refs.minAgeInput.addEventListener('keydown', function (event) {
+        //     if (event.key === 'Enter') runSearch();
+        // });
+        // refs.maxAgeInput.addEventListener('keydown', function (event) {
+        //     if (event.key === 'Enter') runSearch();
+        // });
+        // 限制年龄输入：1~99 的数字，超长或负数自动修正
+        function handleAgeInput(e) {
+            var val = e.target.value;
+            if (val) {
+                var num = parseInt(val, 10);
+                if (isNaN(num) || num < 1) e.target.value = '';
+                else if (num > 99) e.target.value = 99;
+                else e.target.value = num;
+            }
+        }
+        refs.minAgeInput.addEventListener('input', handleAgeInput);
+        refs.maxAgeInput.addEventListener('input', handleAgeInput);
+
+        refs.minAgeInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') runSearch();
+        });
+        refs.maxAgeInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') runSearch();
+        });
+        
         refs.sortSelect.addEventListener('change', function () {
             state.pageIndex = 0;
             fetchActors();
@@ -906,8 +1060,8 @@
 
         var formatted = formatSyncTimestamp(state.libraryMappingLastSyncedUtc);
         refs.syncStatus.textContent = formatted
-            ? 'Last synced at ' + formatted
-            : 'Last synced: pending';
+            ? t.lastSynced + formatted
+            : t.lastSynced + t.pending;
     }
 
     function updateRefreshButtonState() {
@@ -966,9 +1120,9 @@
             : [];
 
         state.availableLibraries = availableLibraries;
-        replaceLibraryFilterOptions(refs.libraryFilter, availableLibraries, 'All libraries');
-        replaceFilterSelectOptions(refs.tagFilter, availableTags, 'All tags');
-        replaceFilterSelectOptions(refs.countryFilter, availableLocations, 'All countries/regions');
+        replaceLibraryFilterOptions(refs.libraryFilter, availableLibraries, t.allLibraries);
+        replaceFilterSelectOptions(refs.tagFilter, availableTags, t.allTags);
+        replaceFilterSelectOptions(refs.countryFilter, availableLocations, t.allCountries);
     }
 
     function renderMeta() {
@@ -977,13 +1131,13 @@
         }
 
         if (state.loading) {
-            refs.countIndicator.textContent = 'Loading...';
+            refs.countIndicator.textContent = t.loading;
         } else if (state.totalCount === 0) {
-            refs.countIndicator.textContent = '0 items';
+            refs.countIndicator.textContent = '0 ' + t.items;
         } else {
             var startNum = state.pageIndex * state.pageSize + 1;
             var endNum = Math.min(startNum + state.items.length - 1, state.totalCount);
-            refs.countIndicator.textContent = startNum + '-' + endNum + ' of ' + state.totalCount;
+            refs.countIndicator.textContent = startNum + '-' + endNum + ' ' + t.of + ' ' + state.totalCount;
         }
     }
 
@@ -993,7 +1147,7 @@
         }
 
         var totalPages = Math.max(1, Math.ceil(state.totalCount / state.pageSize));
-        refs.pageInfo.textContent = 'Page ' + (state.pageIndex + 1) + ' / ' + totalPages;
+        refs.pageInfo.textContent = t.page + ' ' + (state.pageIndex + 1) + ' ' + t.of + ' ' + totalPages;
         refs.prevButton.disabled = state.loading || state.pageIndex <= 0;
         refs.nextButton.disabled = state.loading || (state.pageIndex + 1) >= totalPages;
     }
@@ -1025,6 +1179,12 @@
         }
         if (state.searchTerm) {
             params.set('searchTerm', state.searchTerm);
+        }
+        if (state.minAge) {
+            params.set('minAge', state.minAge);
+        }
+        if (state.maxAge) {
+            params.set('maxAge', state.maxAge);
         }
         if (refs && refs.favFilter && refs.favFilter.checked) {
             params.set('isFavorite', 'true');
@@ -1273,12 +1433,12 @@
         }
 
         var hasDescResults = state.descItems && state.descItems.length > 0;
-        var isSearchMode = !!state.searchTerm;
+        var isSearchMode = !!state.searchTerm || !!state.minAge || !!state.maxAge; // Include age in search mode condition
 
         // Non-search mode: flat list (existing behavior)
         if (!isSearchMode) {
             if (!state.items.length) {
-                showState('No results found.', false);
+                showState(t.noResults, false);
                 refs.descGrid.hidden = true;
                 return;
             }
@@ -1307,7 +1467,7 @@
 
         // Name matches section
         refs.grid.insertAdjacentHTML('beforebegin',
-            '<div class="castcrew-section-header" id="castcrewNameHeader">Name matches: <span class="castcrew-match-count">' + nameCount + ' Found</span></div>');
+            '<div class="castcrew-section-header" id="castcrewNameHeader">' + t.nameMatches + ': <span class="castcrew-match-count">' + nameCount + '</span></div>');
 
         if (nameCount > 0) {
             refs.grid.hidden = false;
@@ -1315,13 +1475,13 @@
             bindCardClicks(refs.grid, state.items);
         } else {
             refs.grid.hidden = false;
-            refs.grid.innerHTML = '<p class="castcrew-section-empty">No name matches found.</p>';
+            refs.grid.innerHTML = '<p class="castcrew-section-empty">' + t.noNameMatches + '</p>';
         }
 
         // Section divider
         refs.descGrid.insertAdjacentHTML('beforebegin',
             '<hr class="castcrew-section-divider" />' +
-            '<div class="castcrew-section-header" id="castcrewDescHeader">Description matches: <span class="castcrew-match-count">' + descCount + ' Found</span></div>');
+            '<div class="castcrew-section-header" id="castcrewDescHeader">' + t.descMatches + ': <span class="castcrew-match-count">' + descCount + '</span></div>');
 
         // Description matches section
         if (descCount > 0) {
@@ -1330,7 +1490,7 @@
             bindCardClicks(refs.descGrid, state.descItems);
         } else {
             refs.descGrid.hidden = false;
-            refs.descGrid.innerHTML = '<p class="castcrew-section-empty">No description matches found.</p>';
+            refs.descGrid.innerHTML = '<p class="castcrew-section-empty">' + t.noDescMatches + '</p>';
         }
 
         // Apply view mode
@@ -1433,9 +1593,10 @@
                 var hasGroupedNameMatches = payload && Array.isArray(payload.NameMatchItems);
                 var hasGroupedDescriptionMatches = payload && Array.isArray(payload.DescriptionMatchItems);
                 var hasGroupedSearchPayload = hasGroupedNameMatches || hasGroupedDescriptionMatches;
+                var isSearchMode = !!state.searchTerm || !!state.minAge || !!state.maxAge; // Include age for grouped payload logic
 
                 // Prefer grouped search payload when available (new API contract)
-                if (state.searchTerm && hasGroupedSearchPayload) {
+                if (isSearchMode && hasGroupedSearchPayload) {
                     state.items = hasGroupedNameMatches ? payload.NameMatchItems : [];
                     state.descItems = hasGroupedDescriptionMatches ? payload.DescriptionMatchItems : [];
 
@@ -1450,9 +1611,17 @@
                 }
 
                 // If searching and grouped payload is not available, do secondary description-match
+                // Note: Only perform secondary description match if there is a searchTerm. Age alone shouldn't trigger overview searching.
                 if (state.searchTerm && !hasGroupedSearchPayload) {
                     state.nameMatchCount = state.items.length;
                     return fetchDescriptionMatches();
+                } else if (isSearchMode && !hasGroupedSearchPayload) {
+                     // If only filtering by age, just show the results directly, not grouped.
+                     // The backend returns them correctly filtered already.
+                     state.totalCount = state.items.length;
+                     state.nameMatchCount = state.totalCount; // Treat age filter as a name match for UI purpose
+                     state.descMatchCount = 0;
+                     state.descItems = [];
                 }
             })
             .then(function () {
@@ -1478,6 +1647,12 @@
         params.set('sortOrder', state.sortOrder);
         if (state.userId) {
             params.set('userId', state.userId);
+        }
+        if (state.minAge) {
+            params.set('minAge', state.minAge);
+        }
+        if (state.maxAge) {
+            params.set('maxAge', state.maxAge);
         }
         if (refs && refs.favFilter && refs.favFilter.checked) {
             params.set('isFavorite', 'true');
@@ -1538,6 +1713,8 @@
         }
 
         state.searchTerm = refs.searchInput.value.trim();
+        state.minAge = refs.minAgeInput.value.trim();
+        state.maxAge = refs.maxAgeInput.value.trim();
         state.pageIndex = 0;
         fetchActors();
     }
@@ -1577,7 +1754,7 @@
         if (!initializeActorsState()) {
             if (refs) {
                 showState('No active Jellyfin web session found. Sign in and reload this page.', true);
-                refs.meta.textContent = '';
+                if (refs.countIndicator) { refs.countIndicator.textContent = ''; }
             }
 
             return;

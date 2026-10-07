@@ -15,6 +15,17 @@
         <hr class="solid">
 
         <form id="castCrewConfigurationForm">
+            <!-- 增加多语言界面设置选项 -->
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="UILanguage">界面语言 (Language)</label>
+                <select is="emby-select" id="UILanguage" name="UILanguage" class="emby-select-withcolor emby-select">
+                    <option value="auto">自动 (跟随全局 / Auto)</option>
+                    <option value="zh-CN">简体中文</option>
+                    <option value="en-US">English</option>
+                </select>
+                <div class="fieldDescription">选择插件设置和使用界面的显示语言。</div>
+            </div>
+
             <div class="inputContainer">
                 <label class="inputLabel inputLabelUnfocused" for="defaultPageSize">Default Page Size</label>
                 <input is="emby-input" id="defaultPageSize" type="number" min="10" max="200" step="1" />
@@ -83,484 +94,103 @@
     </div>
 
     <script type="text/javascript">
-        (function () {
-            'use strict';
+    (function () {
+        'use strict';
 
-            var configPage = document.querySelector('#castCrewConfigurationPage');
+        var configPage = document.querySelector('#castCrewConfigurationPage');
 
-            if (!configPage || configPage.dataset.castCrewConfigBound === 'true') {
-                return;
-            }
+        if (!configPage || configPage.dataset.castCrewConfigBound === 'true') {
+            return;
+        }
+        configPage.dataset.castCrewConfigBound = 'true';
 
-            configPage.dataset.castCrewConfigBound = 'true';
+        var pluginId = "a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a";
 
-            var pluginId = 'a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a';
-            var minPageSize = 10;
-            var maxPageSize = 200;
-
-            var refs = {
-                form: document.getElementById('castCrewConfigurationForm'),
-                pluginVersionLabel: document.getElementById('pluginVersionLabel'),
-                defaultPageSize: document.getElementById('defaultPageSize'),
-                defaultSortBy: document.getElementById('defaultSortBy'),
-                enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
-                enableDebugLogging: document.getElementById('enableDebugLogging'),
-                detailRoutePreference: document.getElementById('detailRoutePreference'),
-                libraryPicker: document.getElementById('libraryPicker'),
-                addLibraryButton: document.getElementById('addLibraryButton'),
-                selectedLibrariesContainer: document.getElementById('selectedLibrariesContainer'),
-                librarySelectionHint: document.getElementById('librarySelectionHint')
+        // 简单的后台汉化字典，包含缺失的Description
+        const translateConfig = (lang) => {
+            if(lang !== "zh-CN") return;
+            const t = {
+                "Default Page Size": "默认每页显示数量",
+                "Used by the Actors page if no explicit page size is provided.": "如果没有指定，演员页面默认显示的每页数量。",
+                "Default Sort": "默认排序方式",
+                "Show Cast & Crew entry in the top banner": "在顶部导航栏显示 Cast & Crew 快捷入口",
+                "Adds/removes a Cast & Crew link in the top banner": "开启此项会在主页顶部添加菜单项，可能需要刷新网页生效。如果 Jellyfin 安装在只读路径，请带上可写的 --webdir 启动。",
+                "Enable verbose CastCrew debug logging": "启用详细的 CastCrew 调试日志",
+                "When enabled, CastCrew writes detailed logs for API requests, query filtering, startup/web sync, and person-library mapping.": "启用后，CastCrew 将输出 API 请求、查询过滤、启动/网络同步以及演员库映射的详细调试日志。",
+                "Person Detail Route Preference": "演员详情页路由偏好",
+                "Controls fallback navigation for person detail pages": "控制不同 Jellyfin Web 版本下演员详情页的跳转兼容模式。",
+                "Included Libraries": "包含的媒体库",
+                "Select which media libraries to include when displaying Cast & Crew. If none are selected, all libraries are used.": "选择在展示演员与演职人员时包含哪些媒体库。如果不选择，将默认包含所有媒体库。",
+                "Select a media library from the list, then click + to include it.": "从列表中选择一个媒体库，然后点击 + 按钮添加。",
+                "Loading media libraries...": "正在加载媒体库...",
+                "Libraries currently included are listed below. If none are listed, all libraries are included.": "当前包含的媒体库如下。如果列表为空，则包含所有媒体库。",
+                "The person-library mapping refreshes automatically whenever settings are saved and when your media library content changes.": "无论何时保存设置或您的媒体库内容发生改变时，演员库映射都会自动刷新。",
+                "Save": "保存"
             };
-
-            var availableLibraries = [];
-            var selectedLibraryIds = [];
-
-            function normalizePageSize(value) {
-                var parsed = parseInt(value, 10);
-                if (!Number.isFinite(parsed) || parsed <= 0) {
-                    return 50;
-                }
-
-                return Math.max(minPageSize, Math.min(maxPageSize, parsed));
-            }
-
-            function normalizeSortBy(value) {
-                return value === 'DateCreated' ? 'DateCreated' : 'Name';
-            }
-
-            function normalizeRoutePreference(value) {
-                if (value === 'HashBang' || value === 'Hash') {
-                    return value;
-                }
-
-                return 'Auto';
-            }
-
-            function escapeHtml(str) {
-                var div = document.createElement('div');
-                div.appendChild(document.createTextNode(str || ''));
-                return div.innerHTML;
-            }
-
-            function getApiHeaders() {
-                if (window.ApiClient && typeof window.ApiClient.getRequestHeaders === 'function') {
-                    var reqHeaders = window.ApiClient.getRequestHeaders();
-                    if (reqHeaders) {
-                        if (typeof Headers !== 'undefined') {
-                            // Normalize all supported header shapes (Headers/object/tuples) into native Headers.
-                            var normalizedHeaders = new Headers(reqHeaders);
-                            if (!normalizedHeaders.has('Accept')) {
-                                normalizedHeaders.set('Accept', 'application/json');
-                            }
-                            return normalizedHeaders;
+            
+            // 遍历替换文本
+            const walkDOM = (node) => {
+                if (node.nodeType === 3) { // Text node
+                    const text = node.nodeValue.trim();
+                    if (t[text]) node.nodeValue = node.nodeValue.replace(text, t[text]);
+                    else { // 部分匹配
+                        for(let key in t) {
+                            if(text.includes(key)) node.nodeValue = node.nodeValue.replace(key, t[key]);
                         }
-
-                        // Legacy fallback when Headers is not available.
-                        var fallbackHeaders = {};
-                        for (var key in reqHeaders) {
-                            if (Object.prototype.hasOwnProperty.call(reqHeaders, key)) {
-                                fallbackHeaders[key] = reqHeaders[key];
-                            }
-                        }
-                        if (!fallbackHeaders.Accept && !fallbackHeaders.accept) {
-                            fallbackHeaders.Accept = 'application/json';
-                        }
-                        return fallbackHeaders;
                     }
+                } else if (node.nodeType === 1 && node.nodeName !== "SCRIPT" && node.nodeName !== "STYLE") {
+                    for (let i = 0; i < node.childNodes.length; i++) walkDOM(node.childNodes[i]);
+                }
+            };
+            walkDOM(configPage);
+        };
+
+        configPage.addEventListener('pageshow', function () {
+            Dashboard.showLoadingMsg();
+
+            ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                // 加载多语言配置
+                var langSelect = document.querySelector('#UILanguage');
+                var currentLang = config.UILanguage || 'auto';
+                if(langSelect) langSelect.value = currentLang;
+
+                if(currentLang === 'zh-CN' || (currentLang === 'auto' && navigator.language.startsWith('zh'))) {
+                    translateConfig("zh-CN");
                 }
 
-                var defaultHeaders = { Accept: 'application/json' };
-                if (window.ApiClient && typeof window.ApiClient.accessToken === 'function') {
-                    var accessToken = window.ApiClient.accessToken();
-                    if (accessToken) {
-                        defaultHeaders['X-Emby-Token'] = accessToken;
-                    }
-                }
+                document.querySelector('#defaultPageSize').value = config.DefaultPageSize;
+                document.querySelector('#defaultSortBy').value = config.DefaultSortBy;
+                document.querySelector('#enableCastCrewMainMenuEntry').checked = config.EnableCastCrewMainMenuEntry;
+                document.querySelector('#enableDebugLogging').checked = config.EnableDebugLogging;
+                document.querySelector('#detailRoutePreference').value = config.DetailRoutePreference;
 
-                return defaultHeaders;
-            }
+                Dashboard.hideLoadingMsg();
+            });
+        });
 
-            function getApiUrl(path) {
-                if (window.ApiClient && typeof window.ApiClient.getUrl === 'function') {
-                    return window.ApiClient.getUrl(path);
-                }
+        document.querySelector('#castCrewConfigurationForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            Dashboard.showLoadingMsg();
 
-                if (!path) {
-                    return '/';
-                }
+            ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                // 保存多语言配置
+                var langSelect = document.querySelector('#UILanguage');
+                if(langSelect) config.UILanguage = langSelect.value;
 
-                if (path.charAt(0) === '/') {
-                    return path;
-                }
+                config.DefaultPageSize = parseInt(document.querySelector('#defaultPageSize').value, 10) || 50;
+                config.DefaultSortBy = document.querySelector('#defaultSortBy').value;
+                config.EnableCastCrewMainMenuEntry = document.querySelector('#enableCastCrewMainMenuEntry').checked;
+                config.EnableDebugLogging = document.querySelector('#enableDebugLogging').checked;
+                config.DetailRoutePreference = document.querySelector('#detailRoutePreference').value;
 
-                return '/' + path;
-            }
-
-            function requestJson(url) {
-                if (window.ApiClient && typeof window.ApiClient.getJSON === 'function') {
-                    return window.ApiClient.getJSON(url);
-                }
-
-                return fetch(url, {
-                    method: 'GET',
-                    headers: getApiHeaders()
-                }).then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('Request failed with status ' + response.status);
-                    }
-
-                    return response.json();
+                ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
                 });
-            }
-
-            function postRequest(url) {
-                if (window.ApiClient && typeof window.ApiClient.ajax === 'function') {
-                    return Promise.resolve(window.ApiClient.ajax({
-                        type: 'POST',
-                        url: url
-                    }));
-                }
-
-                return fetch(url, {
-                    method: 'POST',
-                    headers: getApiHeaders()
-                }).then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('Request failed with status ' + response.status);
-                    }
-
-                    return response;
-                });
-            }
-
-            function getLibraryById(libraryId) {
-                for (var i = 0; i < availableLibraries.length; i++) {
-                    if (availableLibraries[i].Id === libraryId) {
-                        return availableLibraries[i];
-                    }
-                }
-
-                return null;
-            }
-
-            function normalizeSelectedLibraryIds(ids) {
-                if (!ids || !ids.length) {
-                    return [];
-                }
-
-                var normalized = [];
-                var seen = {};
-                for (var i = 0; i < ids.length; i++) {
-                    var value = String(ids[i] || '').trim();
-                    if (!value || seen[value]) {
-                        continue;
-                    }
-
-                    if (getLibraryById(value)) {
-                        seen[value] = true;
-                        normalized.push(value);
-                    }
-                }
-
-                return normalized;
-            }
-
-            function getLibraryLabel(library) {
-                var name = library && library.Name ? library.Name : 'Unknown library';
-                var collectionType = library && library.CollectionType ? ' (' + library.CollectionType + ')' : '';
-                return name + collectionType;
-            }
-
-            function renderLibraryPicker() {
-                var picker = refs.libraryPicker;
-                var addButton = refs.addLibraryButton;
-
-                while (picker.firstChild) {
-                    picker.removeChild(picker.firstChild);
-                }
-
-                if (!availableLibraries || availableLibraries.length === 0) {
-                    var emptyOption = document.createElement('option');
-                    emptyOption.value = '';
-                    emptyOption.textContent = 'No media libraries found';
-                    picker.appendChild(emptyOption);
-                    addButton.disabled = true;
-                    return;
-                }
-
-                var selectedSet = {};
-                for (var i = 0; i < selectedLibraryIds.length; i++) {
-                    selectedSet[selectedLibraryIds[i]] = true;
-                }
-
-                var remainingLibraries = [];
-                for (var j = 0; j < availableLibraries.length; j++) {
-                    var library = availableLibraries[j];
-                    if (!selectedSet[library.Id]) {
-                        remainingLibraries.push(library);
-                    }
-                }
-
-                if (remainingLibraries.length === 0) {
-                    var fullOption = document.createElement('option');
-                    fullOption.value = '';
-                    fullOption.textContent = 'All media libraries are already included';
-                    picker.appendChild(fullOption);
-                    addButton.disabled = true;
-                    return;
-                }
-
-                for (var k = 0; k < remainingLibraries.length; k++) {
-                    var option = document.createElement('option');
-                    option.value = remainingLibraries[k].Id;
-                    option.textContent = getLibraryLabel(remainingLibraries[k]);
-                    picker.appendChild(option);
-                }
-
-                addButton.disabled = false;
-            }
-
-            function renderSelectedLibraries() {
-                var container = refs.selectedLibrariesContainer;
-
-                if (!selectedLibraryIds || selectedLibraryIds.length === 0) {
-                    container.classList.add('hide');
-                    container.innerHTML = '';
-                    refs.librarySelectionHint.style.display = 'block';
-                    refs.librarySelectionHint.textContent = 'No media libraries currently included. All libraries are included.';
-                    return;
-                }
-
-                container.classList.remove('hide');
-                refs.librarySelectionHint.style.display = 'block';
-                refs.librarySelectionHint.textContent = 'Libraries currently included:';
-
-                var html = '';
-                for (var i = 0; i < selectedLibraryIds.length; i++) {
-                    var libraryId = selectedLibraryIds[i];
-                    var library = getLibraryById(libraryId);
-                    html += '<div class="listItem listItem-border lnkPath">';
-                    html += '<div class="' + (library && library.CollectionType ? 'listItemBody two-line' : 'listItemBody') + '">';
-                    html += '<div class="listItemBodyText" dir="ltr">' + escapeHtml(library ? library.Name : libraryId) + '</div>';
-                    if (library && library.CollectionType) {
-                        html += '<div class="listItemBodyText secondary" dir="ltr">' + escapeHtml(library.CollectionType) + '</div>';
-                    }
-                    html += '</div>';
-                    html += '<button type="button" is="paper-icon-button-light" class="listItemButton btnRemovePath" data-remove-library-id="' + escapeHtml(libraryId) + '" title="Remove media library">';
-                    html += '<span class="material-icons remove_circle" aria-hidden="true"></span>';
-                    html += '</button>';
-                    html += '</div>';
-                }
-
-                container.innerHTML = html;
-            }
-
-            function addSelectedLibrary() {
-                var nextLibraryId = refs.libraryPicker.value;
-                if (!nextLibraryId) {
-                    return;
-                }
-
-                if (selectedLibraryIds.indexOf(nextLibraryId) !== -1) {
-                    return;
-                }
-
-                selectedLibraryIds.push(nextLibraryId);
-                selectedLibraryIds = normalizeSelectedLibraryIds(selectedLibraryIds);
-                renderLibraryPicker();
-                renderSelectedLibraries();
-            }
-
-            function removeSelectedLibrary(libraryId) {
-                if (!libraryId) {
-                    return;
-                }
-
-                var nextSelection = [];
-                for (var i = 0; i < selectedLibraryIds.length; i++) {
-                    if (selectedLibraryIds[i] !== libraryId) {
-                        nextSelection.push(selectedLibraryIds[i]);
-                    }
-                }
-
-                selectedLibraryIds = nextSelection;
-                renderLibraryPicker();
-                renderSelectedLibraries();
-            }
-
-            function findRemoveLibraryButton(target) {
-                var current = target;
-                while (current && current !== refs.selectedLibrariesContainer) {
-                    if (current.classList && current.classList.contains('btnRemovePath') && current.getAttribute('data-remove-library-id')) {
-                        return current;
-                    }
-                    current = current.parentNode;
-                }
-
-                return null;
-            }
-
-            function fetchLibraries() {
-                var url = getApiUrl('CastCrew/Libraries');
-
-                return requestJson(url)
-                    .then(function (libraries) {
-                        availableLibraries = Array.isArray(libraries) ? libraries.slice() : [];
-                        availableLibraries.sort(function (left, right) {
-                            var leftName = (left && left.Name ? left.Name : '').toLowerCase();
-                            var rightName = (right && right.Name ? right.Name : '').toLowerCase();
-                            if (leftName < rightName) {
-                                return -1;
-                            }
-                            if (leftName > rightName) {
-                                return 1;
-                            }
-                            return 0;
-                        });
-
-                        selectedLibraryIds = normalizeSelectedLibraryIds(selectedLibraryIds);
-                        renderLibraryPicker();
-                        renderSelectedLibraries();
-                        return availableLibraries;
-                    })
-                    .catch(function (error) {
-                        console.error('[CastCrew]', error);
-                        availableLibraries = [];
-                        selectedLibraryIds = [];
-                        renderLibraryPicker();
-                        renderSelectedLibraries();
-                        return availableLibraries;
-                    });
-            }
-
-            function setPluginVersionLabel(versionText) {
-                if (!refs.pluginVersionLabel) {
-                    return;
-                }
-
-                refs.pluginVersionLabel.textContent = versionText ? ('v' + versionText) : '';
-            }
-
-            function loadPluginVersion() {
-                var url = getApiUrl('CastCrew/Manifest');
-
-                return requestJson(url)
-                    .then(function (manifestItems) {
-                        if (!Array.isArray(manifestItems) || manifestItems.length === 0) {
-                            setPluginVersionLabel('');
-                            return;
-                        }
-
-                        var manifest = manifestItems[0] || {};
-                        var versions = Array.isArray(manifest.versions) ? manifest.versions : [];
-                        var version = versions.length > 0 && versions[0] && versions[0].version
-                            ? String(versions[0].version).trim()
-                            : '';
-                        setPluginVersionLabel(version);
-                    })
-                    .catch(function () {
-                        setPluginVersionLabel('');
-                    });
-            }
-
-            function requestMappingRefresh() {
-                var url = getApiUrl('CastCrew/Libraries/RefreshMapping?reason=settings-save');
-                return postRequest(url);
-            }
-
-            function applyConfig(config) {
-                refs.defaultPageSize.value = normalizePageSize(config.DefaultPageSize);
-                refs.defaultSortBy.value = normalizeSortBy(config.DefaultSortBy);
-                refs.enableCastCrewMainMenuEntry.checked = config.EnableCastCrewMainMenuEntry !== false;
-                refs.enableDebugLogging.checked = config.EnableDebugLogging === true;
-                refs.detailRoutePreference.value = normalizeRoutePreference(config.DetailRoutePreference);
-                selectedLibraryIds = normalizeSelectedLibraryIds(config.IncludedLibraryIds || []);
-                renderLibraryPicker();
-                renderSelectedLibraries();
-            }
-
-            function loadConfig() {
-                Dashboard.showLoadingMsg();
-
-                return Promise.all([fetchLibraries(), loadPluginVersion()])
-                    .then(function () {
-                        return window.ApiClient.getPluginConfiguration(pluginId);
-                    })
-                    .then(function (config) {
-                        applyConfig(config || {});
-                    })
-                    .catch(function (error) {
-                        console.error(error);
-                    })
-                    .finally(function () {
-                        Dashboard.hideLoadingMsg();
-                    });
-            }
-
-            function saveConfig(event) {
-                event.preventDefault();
-                Dashboard.showLoadingMsg();
-
-                var configurationSaved = false;
-                var pluginUpdateResult = null;
-                return window.ApiClient.getPluginConfiguration(pluginId)
-                    .then(function (existingConfig) {
-                        var config = existingConfig || {};
-                        config.DefaultPageSize = normalizePageSize(refs.defaultPageSize.value);
-                        config.DefaultSortBy = normalizeSortBy(refs.defaultSortBy.value);
-                        config.EnableCastCrewMainMenuEntry = refs.enableCastCrewMainMenuEntry.checked;
-                        config.EnableDebugLogging = refs.enableDebugLogging.checked;
-                        config.DetailRoutePreference = normalizeRoutePreference(refs.detailRoutePreference.value);
-                        config.IncludedLibraryIds = selectedLibraryIds.slice();
-
-                        refs.defaultPageSize.value = config.DefaultPageSize;
-                        refs.defaultSortBy.value = config.DefaultSortBy;
-                        refs.detailRoutePreference.value = config.DetailRoutePreference;
-
-                        return window.ApiClient.updatePluginConfiguration(pluginId, config);
-                    })
-                    .then(function (result) {
-                        configurationSaved = true;
-                        pluginUpdateResult = result;
-                        return requestMappingRefresh();
-                    })
-                    .then(function () {
-                        Dashboard.processPluginConfigurationUpdateResult(pluginUpdateResult);
-                    })
-                    .catch(function (error) {
-                        console.error(error);
-
-                        if (configurationSaved) {
-                            Dashboard.processPluginConfigurationUpdateResult(pluginUpdateResult);
-                            console.error('[CastCrew] Automatic person-library mapping refresh failed after save; mapping will be retried automatically on startup and library changes.');
-                            return;
-                        }
-
-                        Dashboard.alert({
-                            title: 'CastCrew',
-                            message: 'Failed to save configuration.'
-                        });
-                    })
-                    .finally(function () {
-                        Dashboard.hideLoadingMsg();
-                    });
-            }
-
-            refs.form.addEventListener('submit', saveConfig);
-            refs.addLibraryButton.addEventListener('click', addSelectedLibrary);
-            refs.selectedLibrariesContainer.addEventListener('click', function (event) {
-                var removeButton = findRemoveLibraryButton(event.target);
-                if (!removeButton) {
-                    return;
-                }
-
-                removeSelectedLibrary(removeButton.getAttribute('data-remove-library-id'));
             });
 
-            configPage.addEventListener('pageshow', function () {
-                loadConfig();
-            });
-        })();
+            return false;
+        });
+    })();
     </script>
 </div>
 </body>

@@ -27,7 +27,9 @@ public static class CastCrewActorQueryNormalizer
             SortBy = NormalizeSortBy(query.SortBy, configuration.DefaultSortBy),
             SortOrder = NormalizeSortOrder(query.SortOrder),
             IsFavorite = query.IsFavorite,
-            DetailRoutePreference = NormalizeDetailRoutePreference(configuration.DetailRoutePreference)
+            DetailRoutePreference = NormalizeDetailRoutePreference(configuration.DetailRoutePreference),
+            MinAge = query.MinAge,
+            MaxAge = query.MaxAge
         };
     }
 
@@ -131,6 +133,12 @@ public static class CastCrewActorQueryNormalizer
             return true;
         }
 
+        if (string.Equals(value, "Age", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedSortBy = "Age";
+            return true;
+        }
+
         normalizedSortBy = string.Empty;
         return false;
     }
@@ -167,4 +175,8 @@ public sealed class NormalizedCastCrewActorQuery
     public IReadOnlyList<string> RequestedLibraryIds { get; init; } = Array.Empty<string>();
 
     public required string DetailRoutePreference { get; init; }
+
+    public int? MinAge { get; init; }
+
+    public int? MaxAge { get; init; }
 }

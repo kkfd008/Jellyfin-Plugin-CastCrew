@@ -4,6 +4,8 @@ namespace Jellyfin.Plugin.CastCrew.Configuration;
 
 public class PluginConfiguration : BasePluginConfiguration
 {
+    public string UILanguage { get; set; } = "auto";
+
     public int DefaultPageSize { get; set; } = CastCrewConfigurationDefaults.DefaultPageSize;
 
     public string DefaultSortBy { get; set; } = CastCrewConfigurationDefaults.SortByName;
@@ -38,3 +40,4 @@ public static class CastCrewConfigurationDefaults
     public const string RoutePreferenceHashBang = "HashBang";
     public const string RoutePreferenceHash = "Hash";
 }
+

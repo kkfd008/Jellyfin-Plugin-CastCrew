@@ -152,8 +152,24 @@ public sealed class CastCrewActorQueryService
             libraryFilteredPersons,
             person => person.ProductionLocations,
             NormalizeProductionLocationFacetValue);
-        var filteredPersons = ApplyFacetFilters(libraryFilteredPersons, normalizedQuery).ToArray();
-        var orderedPersons = ApplySorting(filteredPersons, normalizedQuery);
+            
+        var filteredPersons = ApplyFacetFilters(libraryFilteredPersons, normalizedQuery);
+
+        // Apply age filters based on normalized query
+        var today = System.DateTime.UtcNow;
+        if (normalizedQuery.MinAge.HasValue)
+        {
+            var maxBirthDate = today.AddYears(-normalizedQuery.MinAge.Value);
+            filteredPersons = filteredPersons.Where(p => p.PremiereDate.HasValue && p.PremiereDate.Value <= maxBirthDate);
+        }
+        if (normalizedQuery.MaxAge.HasValue)
+        {
+            var minBirthDate = today.AddYears(-(normalizedQuery.MaxAge.Value + 1));
+            filteredPersons = filteredPersons.Where(p => p.PremiereDate.HasValue && p.PremiereDate.Value > minBirthDate);
+        }
+
+        var filteredPersonsArray = filteredPersons.ToArray();
+        var orderedPersons = ApplySorting(filteredPersonsArray, normalizedQuery);
 
         var pagedPersons = orderedPersons
             .Skip(normalizedQuery.StartIndex)
@@ -167,7 +183,7 @@ public sealed class CastCrewActorQueryService
         return new CastCrewActorsResponse
         {
             Items = items,
-            TotalRecordCount = filteredPersons.Length,
+            TotalRecordCount = filteredPersonsArray.Length,
             StartIndex = normalizedQuery.StartIndex,
             PageSize = normalizedQuery.Limit,
             SortBy = normalizedQuery.SortBy,
@@ -259,22 +275,41 @@ public sealed class CastCrewActorQueryService
             allPersons,
             person => person.ProductionLocations,
             NormalizeProductionLocationFacetValue);
-        var filteredNameMatchPersons = ApplyFacetFilters(nameMatchPersons, normalizedQuery).ToArray();
-        var filteredAllPersons = ApplyFacetFilters(allPersons, normalizedQuery).ToArray();
+            
+        var filteredNameMatchPersons = ApplyFacetFilters(nameMatchPersons, normalizedQuery);
+        var filteredAllPersons = ApplyFacetFilters(allPersons, normalizedQuery);
+
+        // Apply age filters for grouped search
+        var today = System.DateTime.UtcNow;
+        if (normalizedQuery.MinAge.HasValue)
+        {
+            var maxBirthDate = today.AddYears(-normalizedQuery.MinAge.Value);
+            filteredNameMatchPersons = filteredNameMatchPersons.Where(p => p.PremiereDate.HasValue && p.PremiereDate.Value <= maxBirthDate);
+            filteredAllPersons = filteredAllPersons.Where(p => p.PremiereDate.HasValue && p.PremiereDate.Value <= maxBirthDate);
+        }
+        if (normalizedQuery.MaxAge.HasValue)
+        {
+            var minBirthDate = today.AddYears(-(normalizedQuery.MaxAge.Value + 1));
+            filteredNameMatchPersons = filteredNameMatchPersons.Where(p => p.PremiereDate.HasValue && p.PremiereDate.Value > minBirthDate);
+            filteredAllPersons = filteredAllPersons.Where(p => p.PremiereDate.HasValue && p.PremiereDate.Value > minBirthDate);
+        }
+
+        var nameMatchArray = filteredNameMatchPersons.ToArray();
+        var allPersonsArray = filteredAllPersons.ToArray();
 
         // Build set of name-match IDs for exclusion
-        var nameMatchIds = new HashSet<Guid>(filteredNameMatchPersons.Select(p => p.Id));
+        var nameMatchIds = new HashSet<Guid>(nameMatchArray.Select(p => p.Id));
 
         // Filter description matches: overview contains search term, but not already a name match
         var searchTerm = normalizedQuery.SearchTerm!;
-        var descriptionMatchPersons = filteredAllPersons
+        var descriptionMatchPersons = allPersonsArray
             .Where(p => !nameMatchIds.Contains(p.Id)
                 && !string.IsNullOrEmpty(p.Overview)
                 && p.Overview.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         // Apply sorting to both groups
-        var sortedNameMatches = ApplySorting(filteredNameMatchPersons, normalizedQuery).ToArray();
+        var sortedNameMatches = ApplySorting(nameMatchArray, normalizedQuery).ToArray();
         var sortedDescMatches = ApplySorting(descriptionMatchPersons, normalizedQuery).ToArray();
 
         // Limit each group to page size
@@ -461,6 +496,13 @@ public sealed class CastCrewActorQueryService
 
     private static IEnumerable<Person> ApplySorting(IEnumerable<Person> persons, NormalizedCastCrewActorQuery normalizedQuery)
     {
+        if (normalizedQuery.SortBy.Equals("Age", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalizedQuery.SortOrder == CastCrewConfigurationDefaults.SortOrderDescending
+                ? persons.OrderBy(person => person.PremiereDate)
+                : persons.OrderByDescending(person => person.PremiereDate);
+        }
+
         if (normalizedQuery.SortBy == CastCrewConfigurationDefaults.SortByRandom)
         {
             return persons.OrderBy(_ => Random.Shared.Next());
